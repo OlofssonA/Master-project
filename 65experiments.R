@@ -23,7 +23,7 @@ l.glob<-read.csv2("..//export//SampleResultGlobnorm.csv",skip=12, na.string="-",
 dataform<-function(table,targets, dat, sample, rowname){
   samp<-nrow(table)/targets #number of samples in data
   data<-matrix(0,nrow = targets, ncol = samp) #creates the new table, rows=genes and cols=samples
-  rownames(data)<-as.character(l[1:targets,rowname]) #set the rownames to the genenames
+  rownames(data)<-as.character(table[1:targets,rowname]) #set the rownames to the genenames
   colnames(data)<-colnames(data, do.NULL = F) #creates colnames
   k=targets #counter for the end of the sample
   m=1 #counter for the begining of the sample
@@ -113,9 +113,9 @@ expr.dcq<-expr.dcq[, !apply(is.na(expr.dcq), 2, all)]
 expr.dcqGlob<-expr.dcqGlob[, !apply(is.na(expr.dcqGlob), 2, all)]
 
 #Boxplot of rawdata
-p1<-ggplot(na.omit(melt(expr)), aes(as.factor(X2), value)) + geom_boxplot(color="black")+ylab("Raw mean Cq value")+xlab("Sample")+ggtitle("Raw data")
+p1<-ggplot(na.omit(melt(expr.raw)), aes(as.factor(X2), value)) + geom_boxplot(color="black")+ylab("Raw mean Cq value")+xlab("Sample")+ggtitle("Raw data")
 p2<-ggplot(na.omit(melt(expr.dcq)), aes(as.factor(X2), value)) + geom_boxplot(color="black")+ylab("Delta-Cq value (Normalized)")+xlab("Sample")+ ggtitle("Endogenous control")
-ggplot(na.omit(melt(expr.dcqGlob)), aes(as.factor(X2), value)) + geom_boxplot(color="black")+ylab("Delta-Cq value (Normalized)")+xlab("Sample")+ggtitle("Global normalization")
+p3<-ggplot(na.omit(melt(expr.dcqGlob)), aes(as.factor(X2), value)) + geom_boxplot(color="black")+ylab("Delta-Cq value (Normalized)")+xlab("Sample")+ggtitle("Global normalization")
 multiplot(p1, p2, p3, cols=1)
 
 # #Sets the NAs to 0
