@@ -5,6 +5,7 @@ library(calibrate)
 library(reshape)
 # loading the package
 library(dendextend)
+library(rgl)
 
 setwd(".")
 
@@ -86,10 +87,10 @@ multiplot <- function(..., plotlist=NULL, file, cols=1, layout=NULL) {
 sum(l$Sample.Name%in%"Sample 44")
 
 #Reformates the data with the mean Cq values
-expr<-dataform(l,758,3,1,2)
+expr.raw<-dataform(l,758,3,1,2)
 expr.dcq<-dataform(l,758,6,1,2)
 expr.dcqGlob<-dataform(l.glob,758,6,1,2)
-expr.glob<-dataform(l.glob,758,3,1,2)
+expr.globRaw<-dataform(l.glob,758,3,1,2)
 
 
 
@@ -97,25 +98,29 @@ expr.glob<-dataform(l.glob,758,3,1,2)
 
 #To plot the data
 #Creates a datafram
-d <- data.frame(x = 1:171, y = expr.glob[3,], names = colnames(expr))
+d <- data.frame(x = 1:171, y = expr.raw[3,], sampnames = colnames(expr.raw))
+d[is.na(d)]<-0
 #Plots the dataframe with annotation to make it easier to read
-ggplot(d, aes(x,y)) + geom_point(color=ifelse(expr[3,]<1,"red", "black"),size = 3) + 
-  geom_text(aes(label=ifelse(y<1,colnames(expr), ""),hjust=-0.1,just=-2)) + xlab("Sample")+ylab("Mean Cq Endogenous Control") +
+ggplot(d, aes(x,y)) + geom_point(color=ifelse(d$y <1,"red", "black"),size = 3) + 
+  geom_text(aes(label=ifelse(y<1,colnames(expr.raw), ""),hjust=-0.1,just=-2)) + xlab("Sample")+ylab("Mean Cq Endogenous Control") +
   theme(axis.title.x = element_text(face="bold", colour="black", size=15),
         axis.title.y = element_text(face="bold", colour="black", size=15),
         axis.ticks = element_blank(), axis.text.x = element_blank(),
         axis.text.y  = element_text(size=10,face="bold"))+scale_y_continuous(breaks=c(0, 10, 20,30),
                                                                              labels=c("N/A", "10", "20","30"))
+#Removes columns which is Na for every mirna
+expr.dcq<-expr.dcq[, !apply(is.na(expr.dcq), 2, all)]
+expr.dcqGlob<-expr.dcqGlob[, !apply(is.na(expr.dcqGlob), 2, all)]
 
 #Boxplot of rawdata
 p1<-ggplot(na.omit(melt(expr)), aes(as.factor(X2), value)) + geom_boxplot(color="black")+ylab("Raw mean Cq value")+xlab("Sample")+ggtitle("Raw data")
 p2<-ggplot(na.omit(melt(expr.dcq)), aes(as.factor(X2), value)) + geom_boxplot(color="black")+ylab("Delta-Cq value (Normalized)")+xlab("Sample")+ ggtitle("Endogenous control")
-p3<-ggplot(na.omit(melt(expr.dcqGlob)), aes(as.factor(X2), value)) + geom_boxplot(color="black")+ylab("Delta-Cq value (Normalized)")+xlab("Sample")+ggtitle("Global normalization")
+ggplot(na.omit(melt(expr.dcqGlob)), aes(as.factor(X2), value)) + geom_boxplot(color="black")+ylab("Delta-Cq value (Normalized)")+xlab("Sample")+ggtitle("Global normalization")
 multiplot(p1, p2, p3, cols=1)
 
 # #Sets the NAs to 0
 # expr[is.na(expr)]<-0
-# expr.dcq[is.na(expr.dcq)]<-0
+#expr.dcq[is.na(expr.dcq)]<-0
 
 #Loads the info to be able to distinguise between the gorups
 sampinfo<-read.csv2("..//export//WellResults1.csv",skip=12, na.string="-", stringsAsFactors = FALSE)
@@ -132,26 +137,33 @@ Contsamp<-sampgroup[sampgroup$Biological.Group.Name%in%"Control",]
 Diseasamp<-sampgroup[sampgroup$Biological.Group.Name%in%"Disease",]
 
 #Seperate the samples according to biogorup
-aaa<-expr.dcq[,colnames(expr.dcq)%in%Diseasamp$Sample.Name]
-cont<-expr.dcq[,colnames(expr.dcq)%in%Contsamp$Sample.Name]
+aaa.dcq<-expr.dcq[,colnames(expr.dcq)%in%Diseasamp$Sample.Name]
+cont.dcq<-expr.dcq[,colnames(expr.dcq)%in%Contsamp$Sample.Name]
+aaa.glob<-expr.dcqGlob[,colnames(expr.dcqGlob)%in%Diseasamp$Sample.Name]
+cont.glob<-expr.dcqGlob[,colnames(expr.dcqGlob)%in%Contsamp$Sample.Name]
 
 #Filter the data
 filterData<-function(case,control){
-tf.filt<-rep(FALSE, nrow(case))
-for (i in 1:nrow(case)){
-  tf.filt[i]<-(sum(is.na(case[i,])/ncol(case)) < 0.5 & sum(is.na(control[i,]))/ncol(control)<0.5)
-}
-tf.filt
+  tf.filt<-rep(FALSE, nrow(case))
+  for (i in 1:nrow(case)){
+    tf.filt[i]<-(sum(is.na(case[i,])/ncol(case)) < 0.5 & sum(is.na(control[i,]))/ncol(control)<0.5)
+  }
+  tf.filt
 }
 
-tf.filter<-filterData(aaa,cont)
+tf.filter.dcq<-filterData(aaa.dcq,cont.dcq)
+tf.filter.glob<-filterData(aaa.glob,cont.glob)
 #Take only the genes which pass the test
-aaa.filter<-aaa[tf.filter,]
-cont.filter<-cont[tf.filter,]
+aaa.dcq.filter<-aaa.dcq[tf.filter.dcq,]
+cont.dcq.filter<-cont.dcq[tf.filter.dcq,]
+aaa.glob.filter<-aaa.glob[tf.filter.glob,]
+cont.glob.filter<-cont.glob[tf.filter.glob,]
 
-all.filter<-as.matrix(cbind(aaa.filter,cont.filter))
-groups<-c(rep("aaa",65),rep("cont",106))
-all.filter[is.na(all.filter)]<-0
+all.filter.dcq<-as.matrix(cbind(aaa.dcq.filter,cont.dcq.filter))
+all.filter.glob<-as.matrix(cbind(aaa.glob.filter,cont.glob.filter))
+groups.dcq<-c(rep("aaa",ncol(aaa.dcq.filter)),rep("cont",ncol(cont.dcq.filter)))
+groups.glob<-c(rep("aaa",ncol(aaa.glob.filter)),rep("cont",ncol(cont.glob.filter)))
+#all.filter.dcq[is.na(all.filter.dcq)]<-0
 
 #Function to replace the na with the mean
 f1 <- function(vec) {
@@ -160,22 +172,47 @@ f1 <- function(vec) {
   return(vec)
 }
 
-# all.filter.mean <- apply(all.filter,1,f1)
-# all.filter.mean<-t(all.filter.mean)
+## Another way of dealing with NAs, by setting the missing values to the mean
+## and then center the pca it is equal to setting the NAs to zero
+#all.filter.mean <- apply(all.filter,1,f1)
+#all.filter.mean<-t(all.filter.mean)
 
 #If using f1 function set center=T in prcomp
-pca1 = prcomp(na.omit(all.filter.mean))
+pca1.dcq = prcomp(na.omit(all.filter.dcq))
 #create a dataframe with the different loading vector from the pca
-df<-as.data.frame(pca1$rotation[,1])
-df$x<-pca1$rotation[,1]
-df$y <- pca1$rotation[,2]
-df$z<-pca1$rotation[,3]
-df$groups <- groups # Add the group beloing for each sample
+df<-as.data.frame(pca1.dcq$rotation[,1])
+df$x<-pca1.dcq$rotation[,1]
+df$y <- pca1.dcq$rotation[,2]
+df$z<-pca1.dcq$rotation[,3]
+df$groups1 <- groups.dcq # Add the group beloing for each sample
+str(df) # so you can see the structure and names
+
+pca1.glob = prcomp(na.omit(all.filter.glob))
+#create a dataframe with the different loading vector from the pca
+df2<-as.data.frame(pca1.glob$rotation[,1])
+df2$x<-pca1.glob$rotation[,1]
+df2$y <- pca1.glob$rotation[,2]
+df2$z<-pca1.glob$rotation[,3]
+df2$groups2 <- groups.glob # Add the group beloing for each sample
 str(df) # so you can see the structure and names
 
 #Plots the two biggest loading vectors
-ggplot(df, aes(x,y)) + geom_point(aes(color=groups), size=2) + scale_color_manual(values = c("orange", "purple"))
+ggplot(df, aes(x,y)) + geom_point(aes(color=groups1), size=2) + scale_color_manual(values = c("orange", "purple"))
+ggplot(df2, aes(x,y)) + geom_point(aes(color=groups2), size=2) + scale_color_manual(values = c("orange", "purple"))
 
 #Plots the 3 biggest loading vectors
-plot3d(df$x, df$y, df$z,col=c(rep("orange", 65), rep("purple", 103)), cex=10)
-rgl.snapshot("plots///pca3D_EC.png", fmt="png") #Takes a snapshot of the current rgl view
+plot3d(df2$x, df2$y, df2$z,col=c(rep("orange", 65), rep("purple", 103)), cex=20)
+rgl.snapshot("plots///pca3D_glob.png", fmt="png") #Takes a snapshot of the current rgl view
+
+#Plot the distribution of the data
+plot(density(expr.raw,na.rm=T), main="Raw EC")
+plot(density(expr.globRaw,na.rm=T,bw = 0.8229), main="Raw Global control")
+plot(density(expr.dcq,na.rm=T), main="Endogenous control normalization")
+plot(density(expr.dcqGlob,na.rm=T), main="Global normalization")
+
+#Ttest
+pval.glob<-rep(NA,nrow(expr.glob))
+pval.dcq<-rep(NA,nrow(expr.dcq))
+
+for( i in 1:nrow(expr.glob))
+  
