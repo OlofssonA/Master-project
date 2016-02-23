@@ -146,7 +146,7 @@ cont.glob<-expr.dcqGlob[,colnames(expr.dcqGlob)%in%Contsamp$Sample.Name]
 filterData<-function(case,control){
   tf.filt<-rep(FALSE, nrow(case))
   for (i in 1:nrow(case)){
-    tf.filt[i]<-(sum(is.na(case[i,])/ncol(case)) < 0.5 & sum(is.na(control[i,]))/ncol(control)<0.5)
+    tf.filt[i]<-(sum(is.na(case[i,])/ncol(case)) < 0.3 & sum(is.na(control[i,]))/ncol(control)<0.3)
   }
   tf.filt
 }
@@ -211,8 +211,23 @@ plot(density(expr.dcq,na.rm=T), main="Endogenous control normalization")
 plot(density(expr.dcqGlob,na.rm=T), main="Global normalization")
 
 #Ttest
-pval.glob<-rep(NA,nrow(expr.glob))
-pval.dcq<-rep(NA,nrow(expr.dcq))
+pval.glob<-rep(NA,nrow(aaa.glob.filter))
+pval.dcq<-rep(NA,nrow(aaa.dcq.filter))
 
-for( i in 1:nrow(expr.glob))
-  
+for( i in 1:nrow(aaa.glob.filter)){
+  pval.glob[i]<-t.test(aaa.glob.filter[i,],cont.glob.filter[i,],na.action=na.omit)$p.val
+}
+
+for( i in 1:nrow(aaa.dcq.filter)){
+  pval.dcq[i]<-t.test(aaa.dcq.filter[i,],cont.dcq.filter[i,], na.action = na.omit)$p.val
+}
+
+pval.adj.dcq<-p.adjust(pval.dcq,method = "fdr", n=length(pval.dcq))
+pval.adj.glob<-p.adjust(pval.glob,method = "fdr", n=length(pval.glob))
+
+names(pval.adj.dcq)<-rownames(aaa.dcq.filter)
+names(pval.adj.glob)<-rownames(aaa.glob.filter)
+
+which(pval.adj.dcq<0.17)
+which(pval.adj.glob<0.9569182)
+
