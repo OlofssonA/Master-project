@@ -16,10 +16,6 @@ l.glob<-read.csv2("..//export//SampleResultGlobnorm.csv",skip=12, na.string="-",
 #'Takes the output from thermofisher cloud and formats the table by taking out samples as columnnames and 
 #'targets as rownames with the ddcq as row values for each sample
 #'table is the input table and row is the number of targets(number of genes/rows)
-#'@param table A table from thermo fisher cloud export
-#'@param targets The number of targets each sample has
-#'@param dat The column number which has the values for each sample
-#'@param sample The column number which holds the sample id
 dataform<-function(table,targets, dat, sample, rowname){
   samp<-nrow(table)/targets #number of samples in data
   data<-matrix(0,nrow = targets, ncol = samp) #creates the new table, rows=genes and cols=samples
@@ -83,23 +79,31 @@ multiplot <- function(..., plotlist=NULL, file, cols=1, layout=NULL) {
   }
 }
 
+
 #Check the number of targets,
 sum(l$Sample.Name%in%"Sample 44")
 
-#Reformates the data with the mean Cq values
-expr.raw<-dataform(l,758,3,1,2)
-expr.dcq<-dataform(l,758,6,1,2)
-expr.dcqGlob<-dataform(l.glob,758,6,1,2)
-expr.globRaw<-dataform(l.glob,758,3,1,2)
+#Reformates the data so the samples on columns and cq values as rows
+expr.raw<-dataform(l,758,3,1,2) #Mean raw cq endogenous control normalization
+expr.dcq<-dataform(l,758,6,1,2) # Delta Cq values endogenous control normalization
+expr.dcqGlob<-dataform(l.glob,758,6,1,2) # Delta cq global normalization
+expr.globRaw<-dataform(l.glob,758,3,1,2) # Mean raw Cq values global normalization
 
 
 
 
 
-#To plot the data
-#Creates a datafram
-d <- data.frame(x = 1:171, y = expr.raw[3,], sampnames = colnames(expr.raw))
-d[is.na(d)]<-0
+############################################ QC control of the data ###############################################################################
+
+
+####### Endogenous Control data
+###### Needs to check that the choosen control u6 detected in every sample in the raw data
+
+#Creates a datafram to be able to use ggplot 
+# 171 samples in total
+d <- data.frame(x = 1:171, y = expr.raw[3,], sampnames = colnames(expr.raw)) #expr.raq[3,] give the row with expression for U6
+d[is.na(d)]<-0 # sets the NAs to zero to be able to plot them
+
 #Plots the dataframe with annotation to make it easier to read
 ggplot(d, aes(x,y)) + geom_point(color=ifelse(d$y <1,"red", "black"),size = 3) + 
   geom_text(aes(label=ifelse(y<1,colnames(expr.raw), ""),hjust=-0.1,just=-2)) + xlab("Sample")+ylab("Mean Cq Endogenous Control") +
@@ -108,21 +112,23 @@ ggplot(d, aes(x,y)) + geom_point(color=ifelse(d$y <1,"red", "black"),size = 3) +
         axis.ticks = element_blank(), axis.text.x = element_blank(),
         axis.text.y  = element_text(size=10,face="bold"))+scale_y_continuous(breaks=c(0, 10, 20,30),
                                                                              labels=c("N/A", "10", "20","30"))
+
 #Removes columns which is Na for every mirna
 expr.dcq<-expr.dcq[, !apply(is.na(expr.dcq), 2, all)]
 expr.dcqGlob<-expr.dcqGlob[, !apply(is.na(expr.dcqGlob), 2, all)]
 
-#Boxplot of rawdata
-p1<-ggplot(na.omit(melt(expr.raw)), aes(as.factor(X2), value)) + geom_boxplot(color="black")+ylab("Raw mean Cq value")+xlab("Sample")+ggtitle("Raw data")
-p2<-ggplot(na.omit(melt(expr.dcq)), aes(as.factor(X2), value)) + geom_boxplot(color="black")+ylab("Delta-Cq value (Normalized)")+xlab("Sample")+ ggtitle("Endogenous control")
-p3<-ggplot(na.omit(melt(expr.dcqGlob)), aes(as.factor(X2), value)) + geom_boxplot(color="black")+ylab("Delta-Cq value (Normalized)")+xlab("Sample")+ggtitle("Global normalization")
-multiplot(p1, p2, p3, cols=1)
+#Boxplot of rawdata and normalized to visulize the best normalization method
+p1<-ggplot(na.omit(melt(expr.raw)), aes(as.factor(X2), value)) + geom_boxplot(color="black")+ylab("Raw mean Cq value")+xlab("Sample")+ggtitle("Raw data EC")
+p2<-ggplot(na.omit(melt(expr.globRaw)), aes(as.factor(X2), value)) + geom_boxplot(color="black")+ylab("Raw mean Cq value")+xlab("Sample")+ggtitle("Raw data Global")
+p3<-ggplot(na.omit(melt(expr.dcq)), aes(as.factor(X2), value)) + geom_boxplot(color="black")+ylab("Delta-Cq value (Normalized)")+xlab("Sample")+ ggtitle("Endogenous control")
+p4<-ggplot(na.omit(melt(expr.dcqGlob)), aes(as.factor(X2), value)) + geom_boxplot(color="black")+ylab("Delta-Cq value (Normalized)")+xlab("Sample")+ggtitle("Global normalization")
+multiplot(p1, p2, p3, p4, cols=1)
 
 # #Sets the NAs to 0
 # expr[is.na(expr)]<-0
 #expr.dcq[is.na(expr.dcq)]<-0
 
-#Loads the info to be able to distinguise between the gorups
+#Loads the info to be able to distinguise between the groups
 sampinfo<-read.csv2("..//export//WellResults1.csv",skip=12, na.string="-", stringsAsFactors = FALSE)
 
 #Takes the rows which contains unique sample names
@@ -136,36 +142,41 @@ sampgroup<-sampinfo[sample.group,4:5]
 Contsamp<-sampgroup[sampgroup$Biological.Group.Name%in%"Control",]
 Diseasamp<-sampgroup[sampgroup$Biological.Group.Name%in%"Disease",]
 
-#Seperate the samples according to biogorup
+#Seperate the samples according to biogroups
 aaa.dcq<-expr.dcq[,colnames(expr.dcq)%in%Diseasamp$Sample.Name]
 cont.dcq<-expr.dcq[,colnames(expr.dcq)%in%Contsamp$Sample.Name]
 aaa.glob<-expr.dcqGlob[,colnames(expr.dcqGlob)%in%Diseasamp$Sample.Name]
 cont.glob<-expr.dcqGlob[,colnames(expr.dcqGlob)%in%Contsamp$Sample.Name]
 
-#Filter the data
+#Filter the data so that only data mirna which are in a least half of th samples in each biogroup
+# Input is the different biogroups and output is a boolean vector
 filterData<-function(case,control){
   tf.filt<-rep(FALSE, nrow(case))
   for (i in 1:nrow(case)){
-    tf.filt[i]<-(sum(is.na(case[i,])/ncol(case)) < 0.3 & sum(is.na(control[i,]))/ncol(control)<0.3)
+    tf.filt[i]<-(sum(is.na(case[i,])/ncol(case)) < 0.5 & sum(is.na(control[i,]))/ncol(control)<0.5)
   }
   tf.filt
 }
 
+#Boolean vector of which miRNAs to keep
 tf.filter.dcq<-filterData(aaa.dcq,cont.dcq)
 tf.filter.glob<-filterData(aaa.glob,cont.glob)
+
 #Take only the genes which pass the test
 aaa.dcq.filter<-aaa.dcq[tf.filter.dcq,]
 cont.dcq.filter<-cont.dcq[tf.filter.dcq,]
 aaa.glob.filter<-aaa.glob[tf.filter.glob,]
 cont.glob.filter<-cont.glob[tf.filter.glob,]
 
+#Binds the group for PCA
 all.filter.dcq<-as.matrix(cbind(aaa.dcq.filter,cont.dcq.filter))
 all.filter.glob<-as.matrix(cbind(aaa.glob.filter,cont.glob.filter))
-groups.dcq<-c(rep("aaa",ncol(aaa.dcq.filter)),rep("cont",ncol(cont.dcq.filter)))
-groups.glob<-c(rep("aaa",ncol(aaa.glob.filter)),rep("cont",ncol(cont.glob.filter)))
+groups.dcq<-c(rep("aaa",ncol(aaa.dcq.filter)),rep("cont",ncol(cont.dcq.filter))) #Annotation 
+groups.glob<-c(rep("aaa",ncol(aaa.glob.filter)),rep("cont",ncol(cont.glob.filter))) #Annotation
 #all.filter.dcq[is.na(all.filter.dcq)]<-0
 
 #Function to replace the na with the mean
+# To be used with aplly
 f1 <- function(vec) {
   m <- mean(vec, na.rm = TRUE)
   vec[is.na(vec)] <- m
@@ -187,6 +198,7 @@ df$z<-pca1.dcq$rotation[,3]
 df$groups1 <- groups.dcq # Add the group beloing for each sample
 str(df) # so you can see the structure and names
 
+#If using f1 function set center=T in prcomp
 pca1.glob = prcomp(na.omit(all.filter.glob))
 #create a dataframe with the different loading vector from the pca
 df2<-as.data.frame(pca1.glob$rotation[,1])
@@ -210,24 +222,31 @@ plot(density(expr.globRaw,na.rm=T,bw = 0.8229), main="Raw Global control")
 plot(density(expr.dcq,na.rm=T), main="Endogenous control normalization")
 plot(density(expr.dcqGlob,na.rm=T), main="Global normalization")
 
-#Ttest
-pval.glob<-rep(NA,nrow(aaa.glob.filter))
+################Ttest
+#Empty vector for pvalues
+pval.glob<-rep(NA,nrow(aaa.glob.filter)) 
 pval.dcq<-rep(NA,nrow(aaa.dcq.filter))
 
+#T test global normalization
 for( i in 1:nrow(aaa.glob.filter)){
   pval.glob[i]<-t.test(aaa.glob.filter[i,],cont.glob.filter[i,],na.action=na.omit)$p.val
 }
 
+#T test endogenous control
 for( i in 1:nrow(aaa.dcq.filter)){
   pval.dcq[i]<-t.test(aaa.dcq.filter[i,],cont.dcq.filter[i,], na.action = na.omit)$p.val
 }
 
+#Add the rownames to the pvalues
+names(pval.dcq)<-rownames(aaa.dcq.filter)
+names(pval.glob)<-rownames(aaa.glob.filter)
+
+#Adjuste the pvalues with false discovery rate
 pval.adj.dcq<-p.adjust(pval.dcq,method = "fdr", n=length(pval.dcq))
 pval.adj.glob<-p.adjust(pval.glob,method = "fdr", n=length(pval.glob))
 
-names(pval.adj.dcq)<-rownames(aaa.dcq.filter)
-names(pval.adj.glob)<-rownames(aaa.glob.filter)
 
-which(pval.adj.dcq<0.17)
-which(pval.adj.glob<0.9569182)
+#Shows the 10 miRNAS with the lowest pvalue
+sort(pval.adj.dcq, decreasing = F)[1:10]
+sort(pval.adj.glob, decreasing = F)[1:10]
 

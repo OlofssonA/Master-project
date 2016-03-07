@@ -9,6 +9,7 @@ library(rgl)
 
 setwd(".")
 
+#Loading in the data from thermo fisher taqman array
 data<-read.csv2("..//export//96samp//dcq_96samp.csv",skip=12, na.string="-", stringsAsFactors = FALSE)
 data.glob<-read.csv2("..//export//96samp//glob_96samp.csv",skip=12, na.string="-", stringsAsFactors = FALSE)
 
@@ -16,10 +17,6 @@ data.glob<-read.csv2("..//export//96samp//glob_96samp.csv",skip=12, na.string="-
 #'Takes the output from thermofisher cloud and formats the table by taking out samples as columnnames and 
 #'targets as rownames with the ddcq as row values for each sample
 #'table is the input table and row is the number of targets(number of genes/rows)
-#'@param table A table from thermo fisher cloud export
-#'@param targets The number of targets each sample has
-#'@param dat The column number which has the values for each sample
-#'@param sample The column number which holds the sample id
 dataform<-function(table,targets, dat, sample, rowname){
   samp<-nrow(table)/targets #number of samples in data
   data<-matrix(0,nrow = targets, ncol = samp) #creates the new table, rows=genes and cols=samples
@@ -86,18 +83,18 @@ multiplot <- function(..., plotlist=NULL, file, cols=1, layout=NULL) {
 sum(data$Sample.Name%in%"1")
 
 #Get the data on the form which i liek
-expr.raw<-dataform(data,758,3,1,2)
-expr.dcq<-dataform(data,758,6,1,2)
-expr.dcqGlob<-dataform(data.glob,758,6,1,2)
-expr.globRaw<-dataform(data.glob,758,3,1,2)
+expr2.raw<-dataform(data,758,3,1,2)
+expr2.dcq<-dataform(data,758,6,1,2)
+expr2.dcqGlob<-dataform(data.glob,758,6,1,2)
+expr2.globRaw<-dataform(data.glob,758,3,1,2)
 
 #To plot the data
 #Creates a datafram
-d <- data.frame(x = 1:208, y = expr.raw[3,], sampnames = colnames(expr.raw))
+d <- data.frame(x = 1:208, y = expr2.raw[3,], sampnames = colnames(expr2.raw))
 d[is.na(d)]<-0
 #Plots the dataframe with annotation to make it easier to read
 ggplot(d, aes(x,y)) + geom_point(color=ifelse(d$y <1,"red", "black"),size = 3) + 
-  geom_text(aes(label=ifelse(y<1,colnames(expr.raw), ""),hjust=-0.1,just=-2)) + xlab("Sample")+ylab("Mean Cq Endogenous Control") +
+  geom_text(aes(label=ifelse(y<1,colnames(expr2.raw), ""),hjust=-0.1,just=-2)) + xlab("Sample")+ylab("Mean Cq Endogenous Control") +
   theme(axis.title.x = element_text(face="bold", colour="black", size=15),
         axis.title.y = element_text(face="bold", colour="black", size=15),
         axis.ticks = element_blank(), axis.text.x = element_blank(),
@@ -105,14 +102,15 @@ ggplot(d, aes(x,y)) + geom_point(color=ifelse(d$y <1,"red", "black"),size = 3) +
                                                                              labels=c("N/A", "10", "20","30"))
 
 #Remove all the columns which are NA for all mirnas
-expr.dcq<-expr.dcq[, !apply(is.na(expr.dcq), 2, all)]
-expr.dcqGlob<-expr.dcqGlob[, !apply(is.na(expr.dcqGlob), 2, all)]
+expr2.dcq<-expr2.dcq[, !apply(is.na(expr2.dcq), 2, all)]
+expr2.dcqGlob<-expr2.dcqGlob[, !apply(is.na(expr2.dcqGlob), 2, all)]
 
 #Boxplot of rawdata
-p1<-ggplot(na.omit(melt(expr.raw)), aes(as.factor(X2), value)) + geom_boxplot(color="black")+ylab("Raw mean Cq value")+xlab("Sample")+ggtitle("Raw data")
-p2<-ggplot(na.omit(melt(expr.dcq)), aes(as.factor(X2), value)) + geom_boxplot(color="black")+ylab("Delta-Cq value (Normalized)")+xlab("Sample")+ ggtitle("Endogenous control")
-p3<-ggplot(na.omit(melt(expr.dcqGlob)), aes(as.factor(X2), value)) + geom_boxplot(color="black")+ylab("Delta-Cq value (Normalized)")+xlab("Sample")+ggtitle("Global normalization")
-multiplot(p1, p2, p3, cols=1)
+p1<-ggplot(na.omit(melt(expr2.raw)), aes(as.factor(X2), value)) + geom_boxplot(color="black")+ylab("Raw mean Cq value")+xlab("Sample")+ggtitle("Raw data EC")
+p2<-ggplot(na.omit(melt(expr2.globRaw)), aes(as.factor(X2), value)) + geom_boxplot(color="black")+ylab("Raw mean Cq value")+xlab("Sample")+ggtitle("Raw data Global")
+p3<-ggplot(na.omit(melt(expr2.dcq)), aes(as.factor(X2), value)) + geom_boxplot(color="black")+ylab("Delta-Cq value (Normalized)")+xlab("Sample")+ ggtitle("Endogenous control")
+p4<-ggplot(na.omit(melt(expr2.dcqGlob)), aes(as.factor(X2), value)) + geom_boxplot(color="black")+ylab("Delta-Cq value (Normalized)")+xlab("Sample")+ggtitle("Global normalization")
+multiplot(p1, p2, p3, p4, cols=1)
 
 #To get biogroups
 sampinfo<-read.csv2("..//export//96samp//glob_96well.csv",skip=12, na.string="-", stringsAsFactors = FALSE)
@@ -125,10 +123,10 @@ Contsamp<-sampgroup[sampgroup$Biological.Group.Name%in%"Control",]
 Diseasamp<-sampgroup[sampgroup$Biological.Group.Name%in%"Disease",]
 
 #Seperate the samples according to biogorup
-aaa.dcq<-expr.dcq[,colnames(expr.dcq)%in%Diseasamp$Sample.Name]
-cont.dcq<-expr.dcq[,colnames(expr.dcq)%in%Contsamp$Sample.Name]
-aaa.glob<-expr.dcqGlob[,colnames(expr.dcqGlob)%in%Diseasamp$Sample.Name]
-cont.glob<-expr.dcqGlob[,colnames(expr.dcqGlob)%in%Contsamp$Sample.Name]
+aaa.dcq<-expr2.dcq[,colnames(expr2.dcq)%in%Diseasamp$Sample.Name]
+cont.dcq<-expr2.dcq[,colnames(expr2.dcq)%in%Contsamp$Sample.Name]
+aaa.glob<-expr2.dcqGlob[,colnames(expr2.dcqGlob)%in%Diseasamp$Sample.Name]
+cont.glob<-expr2.dcqGlob[,colnames(expr2.dcqGlob)%in%Contsamp$Sample.Name]
 
 #Filter the data
 filterData<-function(case,control){
@@ -211,12 +209,33 @@ for( i in 1:nrow(aaa.dcq.filter)){
   pval.dcq[i]<-t.test(aaa.dcq.filter[i,],cont.dcq.filter[i,], na.action = na.omit)$p.val
 }
 
+names(pval.dcq)<-rownames(aaa.dcq.filter)
+names(pval.glob)<-rownames(aaa.glob.filter)
+
 pval.adj.dcq<-p.adjust(pval.dcq,method = "fdr", n=length(pval.dcq))
 pval.adj.glob<-p.adjust(pval.glob,method = "fdr", n=length(pval.glob))
 
-names(pval.adj.dcq)<-rownames(aaa.dcq.filter)
-names(pval.adj.glob)<-rownames(aaa.glob.filter)
 
-which(pval.adj.dcq<0.05)
-which(pval.adj.glob<0.05)
 
+View(sort(pval.adj.dcq[pval.adj.dcq<0.05], decreasing = F))
+View(sort(pval.adj.glob[pval.adj.glob<0.05], decreasing = F))
+
+mean.aaa.glob<-apply(aaa.glob.filter,1,mean,na.rm=T)
+sd.aaa.glob<-apply(aaa.glob.filter,1,sd,na.rm=T)
+
+mean.cont.glob<-apply(cont.glob.filter,1,mean,na.rm=T)
+sd.cont.glob<-apply(cont.glob.filter,1,sd,na.rm=T)
+
+fc.glob<-rep(NA,length(pval.adj.glob))
+for(i in 1:length(pval.adj.glob)){
+  fc.glob[i]<-(mean.aaa.glob[i]-mean.cont.glob[i]) 
+}
+
+dfGlob<-as.data.frame(all.filter.glob)
+dfGlob$FC<-fc.glob
+dfGlob$Sd_AAA<-sd.aaa.glob
+dfGlob$Sd_Cont<-sd.cont.glob
+dfGlob$Pval<-pval.glob
+dfGlob$AdjPval<-pval.adj.glob
+
+#write.table(dfGlob,file = "..//New Folder/Glob96Data.txt",dec = ",")
