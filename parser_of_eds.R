@@ -1,3 +1,8 @@
+## This script is to be used with the batch script "unzipRename.sh"
+## This script takes the analysis_result.txt file which has been unzipped by the batch script
+## and then loads all the files and parse the well number, sample name, target miRNA and Raw Ct value (Cq)
+## and then saves the file to a R
+
 setwd('..//EXjob/Data/')
 
 filenames <- list.files(pattern="*.txt")
@@ -37,3 +42,6 @@ all.data<-rbind(all.data,dataMerg)
 }
 
 colnames(all.data)<-c("well", "Sample", "Target","Ct")
+all.data<-all.data[-1:-2,]
+
+save(all.data, file = "..//Master-project//AllDataQpcr.RData")
