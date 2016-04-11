@@ -44,11 +44,12 @@ norm<-function(vec){
 
 #Applys the normalizing function for each column/sample
 normDat<-apply(dataAll,2,norm)
+
 boxplot(dataAll, main="Raw data", xlab="Sample", ylab="Ct", na.rm=T)
 boxplot(normDat, main="Normlized data, global normalization", na.rm=T)
 
 #Phenodata
-biogroup<-read.csv2(file = "biogroup_OpenArray.csv")
+biogroup<-read.csv2(file = "..//Data//biogroup_OpenArray.csv")
 aaa.samp<-biogroup[biogroup[,2]==1,] # Sample id collected from AAA patients
 cont.samp<-biogroup[biogroup[,2]==0,] # Samples id collected from controls
 
@@ -134,6 +135,10 @@ volcplot.df$fc<-as.vector(fc)
 ggplot(volcplot.df, aes(fc,-log10(pval.adj)))+geom_point(aes(color=pval.adj<0.05)) + scale_color_manual(values = c("black", "red"))
 
 
+# 
+# #If wanting to remove the endengous controls
+# commonTargets<-c("RNU44_001094","RNU48_001006", "U6 rRNA_001973","ath-miR159a_000338")
+# tf.commonTarget<-rownames(normDat)%in%commonTargets
 
 
 

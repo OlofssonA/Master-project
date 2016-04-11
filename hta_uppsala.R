@@ -15,6 +15,7 @@ library(oligo)
 library(hta20sttranscriptcluster.db)
 library(limma)
 library(genefilter)
+library(ggplot2)
 
 
 Annot <- data.frame(ACCNUM=sapply(contents(hta20sttranscriptclusterACCNUM), paste, collapse=", "), 
@@ -26,9 +27,9 @@ Annot <- data.frame(ACCNUM=sapply(contents(hta20sttranscriptclusterACCNUM), past
 list<-list.celfiles() #list the cel files in current workspace
 celfiles<-read.celfiles(list) #reads the files into R
 eset <- rma(celfiles, normalize=TRUE) #normalizes the celfiles
-data<-as.data.frame(exprs(eset)) # subset the normalized expression values
-annotation(eset)<-"hta20sttranscriptcluster.db"
-sampleNames(eset)<-sub("\\_\\(HTA-2_0).CEL","",sampleNames(eset))
+sampleNames(eset)<-sub("\\_\\(HTA-2_0).CEL","",sampleNames(eset)) #Remove parts of the sample name
+
+
 # pm<-pm(celfiles)
 # 
 # 
@@ -36,25 +37,34 @@ sampleNames(eset)<-sub("\\_\\(HTA-2_0).CEL","",sampleNames(eset))
 # MAplot(eset)
 # dev.off()
 
+#Filters out the transcript with little variance across the sample 
 eset.filterd <- nsFilter(eset, remove.dupEntrez = FALSE,var.cutoff = 0.5)$eset
 
 
-all<-merge(data,Annot,by.x=0,by.y=0,) #merge by rownames
-symbol<-all$SYMBOL  #subset symbol as only needed in this task
-names(symbol)<-all$Row.names # add probset id as rownames to id
 
-biogroup<-read.csv2("Annot.csv", header = T,)
+
+#Get the Phenotypes
+biogroup<-read.csv2("Annot.csv", header = T,) 
 rownames(biogroup)<-biogroup$probe.number.in.HTA
 
-data<-exprs(eset)
+#Only the expression data
+data<-exprs(eset.filterd)
 
+# all<-merge(data,Annot,by.x=0,by.y=0,) #merge by rownames
+# symbol<-all$SYMBOL  #subset symbol as only needed in this task
+# names(symbol)<-all$Row.names # add probset id as rownames to id
 
+#Divides the data into AAA and control
 aaa<-data[,colnames(data)%in%rownames(biogroup[biogroup$group.annotation ==0,])]
 cont<-data[,colnames(data)%in%rownames(biogroup[biogroup$group.annotation ==1,])]
 
+
+
+#Calculates the mean for each transcript
 mean.aaa<-apply(aaa,1,mean)
 mean.cont<-apply(cont,1,mean)
 
+#Vectors to store pvalue and foldchange
 pval<-rep(NA, length(mean.aaa))
 fc<-rep(NA,length(mean.aaa))
 
@@ -64,6 +74,11 @@ for(i in 1:length(mean.aaa)){
   
 }
 
+#Adjust the pvalues with false discovery rate
+pval.adj<-p.adjust(pval, method = "fdr", n = length(pval))
+sort(pval.adj)[1:10]
+
+#Peforms PCA
 groups<-c(rep("aaa",ncol(aaa)),rep("cont",ncol(cont)))
 all.data<-c(aaa,cont)
 pval.adj<-p.adjust(pval,method = "fdr", n=length(pval))
@@ -75,4 +90,4 @@ df$z<-pca1$rotation[,3]
 df$groups1 <- groups
 
 ggplot(df, aes(x,y)) + geom_point(aes(color=groups1), size=2) + scale_color_manual(values = c("orange", "purple"))
-plot3d(df$x, df$y, df$z,col=c(rep("red", ncol(aaa)), rep("purple", ncol(cont))), cex=20)
+
