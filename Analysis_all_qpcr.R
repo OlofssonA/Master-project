@@ -31,7 +31,7 @@ dataAll<-dataform(all.sum,758,3,1,2)
 
 #Function to normalize a vector by subtract it by the mean 
 norm<-function(vec){
-  vec[vec>35]<-NA #Any value above 35 not included
+  vec[vec>38]<-NA #Any value above 35 not included
   meanV<-mean(na.omit(vec)) #Removes NA from the mean calculation
   norm<-rep(0, length(vec))
   for(i in 1:length(vec)){
@@ -44,6 +44,7 @@ norm<-function(vec){
 
 #Applys the normalizing function for each column/sample
 normDat<-apply(dataAll,2,norm)
+
 
 boxplot(dataAll, main="Raw data", xlab="Sample", ylab="Ct", na.rm=T)
 boxplot(normDat, main="Normlized data, global normalization", na.rm=T)
@@ -113,11 +114,13 @@ plot3d(df$x, df$y, df$z,col=c(rep("red", ncol(aaa)), rep("purple", ncol(cont))),
 
 #Empty vector to store pvalues and foldchange
 pval<-rep(1, nrow(aaa.filter))
-fc<-rep(1, nrow(aaa.filter))
+fc.l<-rep(1, nrow(aaa.filter))
+fc.l2<-rep(1, nrow(aaa.filter))
 #Calculate pvalue from ttest and foldchange
 for(i in 1:nrow(aaa.filter)){
   pval[i]<-t.test(aaa.filter[i,], cont.filter[i, ], na.action = na.omit)$p.val #Store only pvalue
-  fc[i]<-2^(-mean(aaa.filter[i,], na.rm=T)-(-mean(cont.filter[i,],na.rm=T))) #Foldchange
+  fc.l2[i]<-mean(aaa.filter[i,], na.rm=T)-(mean(cont.filter[i,],na.rm=T)) #Foldchange
+  fc.l[i]<-2^(-mean(aaa.filter[i,], na.rm=T)-(-mean(cont.filter[i,],na.rm=T))) #Foldchange
 }
 
 names(pval)<-rownames(aaa.filter) #Add the targets name to the pvalue
@@ -125,20 +128,55 @@ names(fc)<-rownames(aaa.filter) #Add the targets name to foldchange
 
 #Adjust the pvalue with false discovery rate
 pval.adj<-p.adjust(pval,method = "fdr", n=length(pval))
-which(pval.adj < 0.05) #Gives the targets which are significant
+k<-which(pval.adj < 0.05) #Gives the targets which are significant
+
 
 #Dataframe for plotting a volcano plot, store pvalue and foldchange
 volcplot.df<-as.data.frame(pval.adj)
 volcplot.df$fc<-as.vector(fc)
 
 #Volcano plot, the significant targets higlighted in red
-ggplot(volcplot.df, aes(fc,-log10(pval.adj)))+geom_point(aes(color=pval.adj<0.05)) + scale_color_manual(values = c("black", "red"))
+ggplot(volcplot.df, aes(fc.l2,-log10(pval.adj)))+geom_point(aes(color=pval.adj<0.05)) + scale_color_manual(values = c("black", "red"))
 
 
+
+heatData<-all.filter[k,]
 # 
 # #If wanting to remove the endengous controls
 # commonTargets<-c("RNU44_001094","RNU48_001006", "U6 rRNA_001973","ath-miR159a_000338")
 # tf.commonTarget<-rownames(normDat)%in%commonTargets
+
+# 3 ####### Heat Map #######
+require(pheatmap)
+library(gplots)
+library(RColorBrewer)
+
+View(data)
+
+result<-heatmap.2(heatData, dendrogram = "none",trace = "none", scale='none', col = brewer.pal(9,"Reds"))
+k<-pheatmap(heatData, cluster_cols = F)
+
+#######
+#######
+
+# 3 ####### Heat Map #######
+# 3 ####### Heat Map #######
+ls()
+View(data)
+class(data)
+load("platformfiles/data.RData")
+heatmap(Ct)
+View(Ct)
+heatmap.2(Ct)
+library(pheatmap)
+pheatmap(data)
+
+data
+
+scale = c("row", "column", "none") in heatmap()
+
+# The main choice that has to be made is whether or not to scale the data
+# And whether to do that by rows or columns - this affects the colour of the heatmap.
 
 
 
