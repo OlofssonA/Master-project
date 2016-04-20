@@ -73,37 +73,34 @@ all.data<-all.data[-1:-2,] #Removes the two first empty rows
 all.data<-as.data.frame(all.data, stringsAsFactors=FALSE) # Make it into dataframe
 all.data$Ct<-as.numeric(all.data$Ct) #Makes the Ct values numeric
 #all.data$Ct[all.data$Ct==100]<-NA #Sets all the Ct=100 to NA
+
+#Changes the ampscore into a dataframe and the score to numeric
 ampScore<-as.data.frame(ampScore, stringsAsFactors = F)
 ampScore$AmpScore<-as.numeric(ampScore$AmpScore)
 
-class(all.data$Well)
+#Changes the well information to numeric
 all.data$Well <-as.numeric(all.data$Well)
-View(all.data)
 
-class(all.data$Well)
-
-all.dataOrderd<-all.data[with(all.data,order(Barcode,Sample)),]
+#Sort the Ct values and ampscore values match
+all.dataOrderd<-all.data[with(all.data,order(Barcode,Well)),]
 ampScoreOrderd<-ampScore[with(ampScore, order(Barcode,Well)),]
 
+#Add the Sample id to the ampscore
+ampScoreOrderd$Sample<-all.dataOrderd$Sample
 
-sortnames <- c("Barcode","Well")
-all.data.sorted<- all.data[do.call("order", all.data[sortnames]),]
-ampscore.sorted<-ampScore[do.call("order", ampScore[sortnames]),]
-all.data.sorted<-all.data.sorted[,-6]
-ampscore.sorted$Sample<-all.data.sorted$Sample
-
-sortnames2 <- c("Barcode","Sample")
-
-all.data.sorted1<- all.data.sorted[do.call("order", all.data.sorted[sortnames2]),]
-ampscore.sorted1<-ampscore.sorted[do.call("order", ampscore.sorted[sortnames2]),]
-
-all.data.sorted1$Sample<-sub(" 0*", " ", all.data.sorted1$Sample) #Remove all the 0 infront of a sample number
+#Sort the data on the sample name and barcode id
+all.dataOrderd1<-all.data[with(all.data,order(Barcode,Sample)),]
+ampScoreOrderd1<-ampScoreOrderd[with(ampScoreOrderd, order(Barcode,Sample)),]
 
 
+#Remove all the 0 infront of a sample number, this to deal with replicates
+all.dataOrderd1$Sample<-sub(" 0*", " ", all.dataOrderd1$Sample) 
 
 
+AmpThres<-ampScoreOrderd$AmpScore<1.1
 
-
+all.data.AmpThre<-all.dataOrderd1
+all.data.AmpThre$Ct[AmpThres]<-40
 
 
 
@@ -114,10 +111,13 @@ all.data.sorted1$Sample<-sub(" 0*", " ", all.data.sorted1$Sample) #Remove all th
 
 
 #Takes the mean of Ct values with the same target and sample id 
-all.sum<-ddply(all.data.sorted1, c("Sample","Target"),summarize, Ct= 
-                 min(na.omit(Ct))) 
+all.sum<-ddply(all.dataOrderd1, c("Sample","Target"),summarize, Ct= 
+                 mean(na.omit(Ct))) 
 
+
+all.sumAmpFilter<-ddply(all.data.AmpThre, c("Sample","Target"),summarize, Ct= 
+                          mean(na.omit(Ct))) 
 
 
 # # Saves the data
-#save(all.data.sorted1,all.sum, file = "..//Master-project//AllDataQpcr.RData")
+#save(all.dataOrderd1, all.sum, all.sumAmpFilter, file = "..//Master-project//AllDataQpcrRemovedData.RData")

@@ -1,5 +1,5 @@
 setwd("..//Master-project/")
-load("AllDataQpcr.RData")
+load("AllDataQpcrRemovedData.RData")
 library(reshape)
 library(ggplot2)
 library(rgl)
@@ -27,6 +27,8 @@ dataform<-function(table,targets, dat, sample, rowname){
 
 #Format the data on the same form as micro array
 dataAll<-dataform(all.sum,758,3,1,2)
+#dataAll<-dataform(all.sumAmpFilter,758,3,1,2)
+
 
 
 #Function to normalize a vector by subtract it by the mean 
@@ -124,19 +126,28 @@ for(i in 1:nrow(aaa.filter)){
 }
 
 names(pval)<-rownames(aaa.filter) #Add the targets name to the pvalue
-names(fc)<-rownames(aaa.filter) #Add the targets name to foldchange
+names(fc.l2)<-rownames(aaa.filter) #Add the targets name to foldchange
 
 #Adjust the pvalue with false discovery rate
-pval.adj<-p.adjust(pval,method = "fdr", n=length(pval))
+pval.adj<-p.adjust(pval,method = "fdr")
 k<-which(pval.adj < 0.05) #Gives the targets which are significant
+
+#View(cbind(pval.adj[k],fc.l2[k]))
+
 
 
 #Dataframe for plotting a volcano plot, store pvalue and foldchange
 volcplot.df<-as.data.frame(pval.adj)
-volcplot.df$fc<-as.vector(fc)
+volcplot.df$fc.l2<-as.vector(fc.l2)
 
 #Volcano plot, the significant targets higlighted in red
-ggplot(volcplot.df, aes(fc.l2,-log10(pval.adj)))+geom_point(aes(color=pval.adj<0.05)) + scale_color_manual(values = c("black", "red"))
+ggplot(volcplot.df, aes(fc.l2,-log10(pval)))+geom_point(aes(color=pval<0.05)) + 
+  scale_color_manual(values = c("black", "red"))+geom_vline(xintercept = 0)+
+  geom_hline(yintercept = -log10(0.05))+ 
+  annotate("text", x = 2, y =5, label = "Fold change > 0 Uppregulated in AAA ")+
+  xlab("Log2 Fold Change") +
+  ylab("Adjusted log10 Pvalues") 
+
 
 
 
@@ -151,32 +162,8 @@ require(pheatmap)
 library(gplots)
 library(RColorBrewer)
 
-View(data)
+pheatmap(heatData, cluster_cols = F)
 
-result<-heatmap.2(heatData, dendrogram = "none",trace = "none", scale='none', col = brewer.pal(9,"Reds"))
-k<-pheatmap(heatData, cluster_cols = F)
-
-#######
-#######
-
-# 3 ####### Heat Map #######
-# 3 ####### Heat Map #######
-ls()
-View(data)
-class(data)
-load("platformfiles/data.RData")
-heatmap(Ct)
-View(Ct)
-heatmap.2(Ct)
-library(pheatmap)
-pheatmap(data)
-
-data
-
-scale = c("row", "column", "none") in heatmap()
-
-# The main choice that has to be made is whether or not to scale the data
-# And whether to do that by rows or columns - this affects the colour of the heatmap.
 
 
 

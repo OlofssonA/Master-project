@@ -16,19 +16,24 @@ library(hta20sttranscriptcluster.db)
 library(limma)
 library(genefilter)
 library(ggplot2)
-
-
-Annot <- data.frame(ACCNUM=sapply(contents(hta20sttranscriptclusterACCNUM), paste, collapse=", "), 
-                    SYMBOL=sapply(contents(hta20sttranscriptclusterSYMBOL), paste, collapse=", "), 
-                    DESC=sapply(contents(hta20sttranscriptclusterGENENAME), paste, collapse=", "),
-                    GO=sapply(contents(hta20sttranscriptclusterGO), paste, collapse=", "))
-
-
-list<-list.celfiles() #list the cel files in current workspace
-celfiles<-read.celfiles(list) #reads the files into R
-eset <- rma(celfiles, normalize=TRUE) #normalizes the celfiles
-sampleNames(eset)<-sub("\\_\\(HTA-2_0).CEL","",sampleNames(eset)) #Remove parts of the sample name
-
+# 
+# 
+# Annot <- data.frame(ACCNUM=sapply(contents(hta20sttranscriptclusterACCNUM), paste, collapse=", "), 
+#                     SYMBOL=sapply(contents(hta20sttranscriptclusterSYMBOL), paste, collapse=", "), 
+#                     DESC=sapply(contents(hta20sttranscriptclusterGENENAME), paste, collapse=", "),
+#                     GO=sapply(contents(hta20sttranscriptclusterGO), paste, collapse=", "))
+# # 
+# # 
+# list<-list.celfiles() #list the cel files in current workspace
+# celfiles<-read.celfiles(list) #reads the files into R
+# eset <- rma(celfiles, normalize=TRUE) #normalizes the celfiles
+# sampleNames(eset)<-sub("\\_\\(HTA-2_0).CEL","",sampleNames(eset)) #Remove parts of the sample name
+# annotation(eset) <- "hta20sttranscriptcluster.db" #Add annoation
+# 
+# 
+# 
+# save(eset, file="AffyRaw.RData")
+load("AffyRaw.RData")
 
 # pm<-pm(celfiles)
 # 
@@ -58,18 +63,30 @@ data<-exprs(eset.filterd)
 aaa<-data[,colnames(data)%in%rownames(biogroup[biogroup$group.annotation ==0,])]
 cont<-data[,colnames(data)%in%rownames(biogroup[biogroup$group.annotation ==1,])]
 
+#Filtering out low expression
+filterData<-function(case,control){
+  tf.filt<-rep(FALSE, nrow(case))
+  for (i in 1:nrow(case)){
+    tf.filt[i]<-(sum(case[i,] <5)/ncol(case)) < 0.5 & (sum(control[i,] < 5)/ncol(control))<0.5 
+  }
+  tf.filt
+}
 
+
+tf.filter<-filterData(aaa,cont)
+aaa.filter<-aaa[tf.filter,]
+cont.filter<-cont[tf.filter,]
 
 #Calculates the mean for each transcript
-mean.aaa<-apply(aaa,1,mean)
-mean.cont<-apply(cont,1,mean)
+mean.aaa<-apply(aaa.filter,1,mean)
+mean.cont<-apply(cont.filter,1,mean)
 
 #Vectors to store pvalue and foldchange
 pval<-rep(NA, length(mean.aaa))
 fc<-rep(NA,length(mean.aaa))
 
 for(i in 1:length(mean.aaa)){
-  pval[i]<-t.test(aaa[i,],cont[i,])$p.val
+  pval[i]<-t.test(aaa.filter[i,],cont.filter[i,])$p.val
   fc[i]<-mean.aaa[i]-mean.cont[i]
   
 }
