@@ -1,4 +1,5 @@
 require(plyr) 
+require(prodlim)
 
 ## This script is to be used with the batch script "unzipRename.sh"
 ## This script takes the analysis_result.txt file which has been unzipped by the batch script
@@ -8,23 +9,23 @@ require(plyr)
 #The folder with the txt files
 setwd('..//Data/')
 
-# Names of all the txt files in that folder
-filenamesAmp <- list.files(pattern="*.amp.txt")
-k<-read.delim("NQH27_OA_miRNA_Human.amp.txt", skip=1)
-filenamesCt<-list.files(pattern="*.raw.txt")
-
-#Get the amplification score
-ampScore<-as.data.frame(cbind(0,0,0,0))
-colnames(ampScore)<-c("Well", "Target", "AmpScore", "Barcode")
-for(i in 1:length(filenamesAmp) ){
-  file<-read.delim(filenamesAmp[i], skip=1)
-  barcode<-sub(" *_OA_miRNA_Human.amp.txt", "", filenamesAmp[i])
-  amp1<-as.data.frame(cbind(file,rep(barcode,nrow(file))))
-  colnames(amp1)<-c("Well", "Target", "AmpScore", "Barcode")
-  ampScore<-rbind(ampScore,amp1)
-  
-}
-ampScore<-ampScore[-1,]
+# # Names of all the txt files in that folder
+# filenamesAmp <- list.files(pattern="*.amp.txt")
+# k<-read.delim("NQH27_OA_miRNA_Human.amp.txt", skip=1)
+ filenamesCt<-list.files(pattern="*.raw.txt")
+# 
+# #Get the amplification score
+# ampScore<-as.data.frame(cbind(0,0,0,0))
+# colnames(ampScore)<-c("Well", "Target", "AmpScore", "Barcode")
+# for(i in 1:length(filenamesAmp) ){
+#   file<-read.delim(filenamesAmp[i], skip=1)
+#   barcode<-sub(" *_OA_miRNA_Human.amp.txt", "", filenamesAmp[i])
+#   amp1<-as.data.frame(cbind(file,rep(barcode,nrow(file))))
+#   colnames(amp1)<-c("Well", "Target", "AmpScore", "Barcode")
+#   ampScore<-rbind(ampScore,amp1)
+#   
+# }
+# ampScore<-ampScore[-1,]
 
 
 #creates a matrix to be able to store the data
@@ -74,50 +75,60 @@ all.data<-as.data.frame(all.data, stringsAsFactors=FALSE) # Make it into datafra
 all.data$Ct<-as.numeric(all.data$Ct) #Makes the Ct values numeric
 #all.data$Ct[all.data$Ct==100]<-NA #Sets all the Ct=100 to NA
 
-#Changes the ampscore into a dataframe and the score to numeric
-ampScore<-as.data.frame(ampScore, stringsAsFactors = F)
-ampScore$AmpScore<-as.numeric(ampScore$AmpScore)
 
 #Changes the well information to numeric
 all.data$Well <-as.numeric(all.data$Well)
 
 #Sort the Ct values and ampscore values match
 all.dataOrderd<-all.data[with(all.data,order(Barcode,Well)),]
-ampScoreOrderd<-ampScore[with(ampScore, order(Barcode,Well)),]
 
-#Add the Sample id to the ampscore
-ampScoreOrderd$Sample<-all.dataOrderd$Sample
+
 
 #Sort the data on the sample name and barcode id
 all.dataOrderd1<-all.data[with(all.data,order(Barcode,Sample)),]
-ampScoreOrderd1<-ampScoreOrderd[with(ampScoreOrderd, order(Barcode,Sample)),]
+
 
 
 #Remove all the 0 infront of a sample number, this to deal with replicates
 all.dataOrderd1$Sample<-sub(" 0*", " ", all.dataOrderd1$Sample) 
-
-
-AmpThres<-ampScoreOrderd$AmpScore<1.1
-
-all.data.AmpThre<-all.dataOrderd1
-all.data.AmpThre$Ct[AmpThres]<-40
+all.dataOrderd1$Barcode<-sub(" ", "", all.dataOrderd1$Barcode) 
 
 
 
-#all.data$Sample<-sub(" 0*", " ", all.data$Sample) #Remove all the 0 infront of a sample number
+
+removeSamp<-read.csv2("rerunnedSamp.csv")
+removeSamp$Barcode<-sub(" ", "", removeSamp$Barcode)
+
+
+
+tf.Remove<-(all.dataOrderd1$Sample%in%removeSamp$Sample & all.dataOrderd1$Barcode%in%removeSamp$Barcode)
+
+
+alldat<-as.data.frame(cbind(all.dataOrderd1$Sample,all.dataOrderd1$Barcode))
+
+h<-row.match(alldat, removeSamp, nomatch = NA)
+j<-is.equal(alldat,removeSamp)
+
+m<-all.dataOrderd1[is.na(h),]
+
+summ<-rep(0,nrow(removeSamp))
+for(i in 1:nrow(removeSamp)){
+  summ[i]<-sum(m$Barcode==removeSamp$Barcode[i] & m$Sample==removeSamp$Sample[i])
+  
+}
 
 
 
 
 
 #Takes the mean of Ct values with the same target and sample id 
-all.sum<-ddply(all.dataOrderd1, c("Sample","Target"),summarize, Ct= 
+all.sum<-ddply(m, c("Sample","Target","Barcode"),summarize, Ct= 
                  mean(na.omit(Ct))) 
 
 
-all.sumAmpFilter<-ddply(all.data.AmpThre, c("Sample","Target"),summarize, Ct= 
-                          mean(na.omit(Ct))) 
+# all.sumAmpFilter<-ddply(all.data.AmpThre, c("Sample","Target"),summarize, Ct= 
+#                           mean(na.omit(Ct))) 
 
 
 # # Saves the data
-#save(all.dataOrderd1, all.sum, all.sumAmpFilter, file = "..//Master-project//AllDataQpcrRemovedData.RData")
+#save(allData.noDupl, all.sum, file = "..//Master-project//AllData20160429.RData")
