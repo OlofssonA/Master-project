@@ -1,33 +1,42 @@
 setwd("..//Master-project/")
-load("AllData20160429.RData")
-summary(all.data.sorted1)
+load("AllData20160512.RData")
+library(RColorBrewer)
+library(ggplot2)
 
-#'Takes the output from thermofisher cloud and formats the table by taking out samples as columnnames and 
-#'targets as rownames with the ddcq as row values for each sample
-#'table is the input table and row is the number of targets(number of genes/rows)
-dataform<-function(table,targets, dat, sample, rowname){
-  samp<-nrow(table)/targets #number of samples in data
-  data<-matrix(0,nrow = targets, ncol = samp) #creates the new table, rows=genes and cols=samples
-  rownames(data)<-as.character(table[1:targets,rowname]) #set the rownames to the genenames
+#' Formate the output from parser_of_eds to a matrix with samples as columns
+#' and miRNAs as rows.
+#' 
+#' @param table A table from parser_of_eds.R.
+#' @param ntargets The number of unique miRNAs for each sample.
+#' @param Ctval The column number which contains the Ct values.
+#' @param SampleID The column which contains the Sample IDs.
+#' @param miRID The column which contains the miRNAs Ids. 
+#' @return matrix A matrix with Samples column wise and miRNAs row wise.
+
+edsToMatrix<-function(table, ntargets, Ctval, SampleID, miRID){
+  samp<-nrow(table)/ntargets #number of samples in data
+  data<-matrix(0,nrow = ntargets, ncol = samp) #creates the new table, rows=genes and cols=samples
+  rownames(data)<-as.character(table[1:ntargets,miRID]) #set the rownames to the genenames
   colnames(data)<-colnames(data, do.NULL = F) #creates colnames
-  k=targets #counter for the end of the sample
+  k=ntargets #counter for the end of the sample
   m=1 #counter for the begining of the sample
   for (i in seq(from = 1,to = samp)){ #sets the ddcq values for each sample
-    colnames(data)[i]<-table[(k*i),sample] #names the column according to sample
-    data[,i]<-table[m:(i*k),dat] #Adds data according to sample
+    colnames(data)[i]<-table[(k*i),SampleID] #names the column according to sample
+    data[,i]<-table[m:(i*k),Ctval] #Adds data according to sample
     m=(i*k+1) #increases beginging of sample
     
   }
   data
 }
 
-
+#Imports the batches
 batches<-read.csv2("..//Data//batch.csv")
-removed<-cbind(read.delim("..//Data/removededs2.txt",header = F))
+#removed<-cbind(read.delim("..//Data/removededs2.txt",header = F))
 
+#Reformates the data, uses the barcode ID as sample iF
+data<-edsToMatrix(m,818,4,5,3)
 
-data<-dataform(allData.noDupl,818,4,5,3)
-
+#Divied the data into batches
 a<-data[,colnames(data)%in%batches[,1]]
 b<-data[,colnames(data)%in%batches[,2]]
 c<-data[,colnames(data)%in%batches[,3]]
@@ -53,12 +62,13 @@ v<-data[,colnames(data)%in%batches[,22]]
 w<-data[,colnames(data)%in%batches[,23]]
 x<-data[,colnames(data)%in%batches[,24]]
 
-remove<-data[,colnames(data)%in%removed$V1]
-used<-data[,!colnames(data)%in%removed$V1]
+#remove<-data[,colnames(data)%in%removed$V1]
+#used<-data[,!colnames(data)%in%removed$V1]
 
-groups<-c(rep("Removed",ncol(remove)), rep("Used",ncol(used)))
-pcaDat<-cbind(remove,used)
+#groups<-c(rep("Removed",ncol(remove)), rep("Used",ncol(used)))
+#pcaDat<-cbind(remove,used)
 
+#To annotate for the PCA
 groups<-c(rep("a",ncol(a)),rep("b",ncol(b)),rep("c",ncol(c)),rep("d",ncol(d)),rep("e",ncol(e)),rep("f",ncol(f)),
              rep("g",ncol(g)),rep("h",ncol(h)), rep("i",ncol(i)),rep("j",ncol(j)),rep("k",ncol(k)),rep("l",ncol(l)),
              rep("m",ncol(m)),rep("n",ncol(n)), rep("o",ncol(o)), rep("p",ncol(p)), rep("q",ncol(q)) ,rep("r",ncol(r)), rep("s",ncol(s)),
@@ -66,36 +76,26 @@ groups<-c(rep("a",ncol(a)),rep("b",ncol(b)),rep("c",ncol(c)),rep("d",ncol(d)),re
 
 pcaDat<-cbind(a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x)
 
-pca1.dcq = prcomp(pcaDat)
+pca.batch = prcomp(pcaDat)
 
 
 #create a dataframe with the different loading vector from the pca
-df<-as.data.frame(pca1.dcq$rotation[,1])
-df$x<-pca1.dcq$rotation[,1]
-df$y <- pca1.dcq$rotation[,2]
-df$z<-pca1.dcq$rotation[,3]
+df<-as.data.frame(pca.batch$rotation[,1])
+df$x<-pca.batch$rotation[,1]
+df$y <- pca.batch$rotation[,2]
+#df$z<-pca1.batch$rotation[,3]
 df$Batches <- groups # Add the group beloing for each sample
 
-library(RColorBrewer)
-nt <- 24
+#To get as many different colors as possible
 qual_col_pals = brewer.pal.info[brewer.pal.info$category == 'qual',]
 col_vector = unlist(mapply(brewer.pal, qual_col_pals$maxcolors, rownames(qual_col_pals)))
 
+#Plots the batch effect
 ggplot(df, aes(x,y)) + geom_point(aes(color=Batches), size=3)+ scale_color_manual(values = col_vector)+
   ggtitle("Data coloured after the batches")
 
 
-pie(rep(1,nt), col=sample(col_vector, nt))
 
 
-hcd<-as.dendrogram(hclust(dist(t(data))))
-plot(hcd)
 
-
-op = par(mfrow = c(2, 1))
-plot(cut(hcd, h = 400)$upper, main = "Upper tree of cut at h=75")
-plot(cut(hcd, h = 400)$lower[[22]], main = "Second branch of lower tree with cut at h=75")
-
-par(cex=0.5,font=1)
-plot(hcd, main="Dendrogram of Ward's Method")
 
